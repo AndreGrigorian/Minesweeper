@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <ctype.h>
 
 
 //global variables
@@ -34,11 +35,26 @@ cell **board; //2-d dynamically allocated array of cells
 int rows;
 int cols;
 int mines;
+int uncover_counter; //determines if you win
 
+
+
+void game_reset(){
+    board = NULL;
+    rows = 0;
+    cols = 0;
+    mines = 0;
+    uncover_counter = 0;
+}
 
 
 int get_random(int range) {
     return rand() % ((range-1) - 0 + 1)+0; // (max-min+1) + min
+}
+
+int is_valid_cell(int r, int c){
+    if((r <= rows && r>0) && (c <= cols && c>0)) return 1;
+    else return 0;
 }
 
 void generate_mines(){
@@ -58,7 +74,6 @@ void generate_mines(){
 
 
 void command_new(){
-    free(board);
     board = (cell **) malloc(sizeof(cell *) * rows);
     for (int i = 0; i<rows; i++){
         board[i] = (cell *) malloc(sizeof(cell) * cols);
@@ -67,7 +82,7 @@ void command_new(){
     for(int i =0; i<rows; i++){
         for (int j=0; j<cols; j++){
             board[i][j].position = i*cols + j;
-//            printf("%d\n", board[i][j].position);
+            board[i][j].covered = 1;
         }
     }
     generate_mines();
@@ -94,12 +109,16 @@ void command_new(){
     
 }
 
-//void display_cell(cell *c){
-//    printf("%3s", "/");
-//}
 
 void display_cell(cell *c) {
-    if(c->flagged == 1) printf("%3s", "f");
+    if(c->flagged == 1) printf("%3s", "P");
+    else if(c->covered == 1) printf("%3s", "/");
+    else if (c->has_mine == 1) printf("%3s", "*");
+    else if (c->adj_count > 0) printf("%3d", c->adj_count);
+    else printf("%3s", ".");
+}
+
+void display_cell_answers(cell *c) {
     if (c->has_mine == 1) printf("%3s", "*");
     else if (c->adj_count == 0) printf("%3s", ".");
     else printf("%3d",c->adj_count);
@@ -109,7 +128,7 @@ void init_cell(cell *c, int p) {
     c->position = p; // each cell knows its pos in board
     c->has_mine = 0; // mined initially false
     c->adj_count = 0; // adjcount initially 0
-    c->covered = 0; // covered initially false
+    c->covered = 0; // covered initially true
     c->flagged = 0; // flagged initially false
 }
 
@@ -126,19 +145,123 @@ void command_show(){
         printf("%3d|", i+1); //print row numbers
         for(int j = 0; j< cols; j++){
             display_cell(&board[i][j]);
-//            printf("%3d", board[i][j].adj_count);
+        }
+        printf("\n");
+    }
+    
+    
+    //----debugging stuff----//
+    
+    printf("Answers\n");
+    printf(" ");
+    for(int i = 0; i<= cols; i++){
+        printf("%3d", i);
+    }
+    printf("\n");
+    
+    for(int i = 0; i<rows; i++){
+        printf("%3d|", i+1); //print row numbers
+        for(int j = 0; j< cols; j++){
+            display_cell_answers(&board[i][j]);
         }
         printf("\n");
     }
 }
 
 
+
+void check_win(){
+    for(int i =0; i< rows;i++){
+        for(int j =0; j<cols; j++){
+            if(board[i][j].has_mine && !board[i][j].flagged){
+                return;
+            }
+            else if (!board[i][j].has_mine && board[i][j].covered){
+                return;
+            }
+        }
+    }
+    printf("You Won!!\n");
+    game_reset();
+}
+
 void command_flag(int r, int c){
-    printf("%d %d", r, c);
-    board[r][c].flagged = 1;
+    if(is_valid_cell(r, c)){
+        board[r-1][c-1].flagged = 1;
+        check_win();
+    }
+    else{
+        printf("%s\n", "index out of bounds");
+    }
 }
 
 
+void command_unflag(int r, int c){
+    if(is_valid_cell(r, c)){
+        board[r-1][c-1].flagged = 0;
+    }
+    else{
+        printf("%s\n", "index out of bounds");
+    }
+}
+
+
+
+void uncover_recursive(int r, int c){
+    int rowneighbors[] = {-1,-1,+0,+1,+1,+1,+0,-1};
+    int colneighbors[] = {+0,+1,+1,+1,+0,-1,-1,-1};
+    if(!is_valid_cell(r, c) || !board[r][c].covered || board[r][c].has_mine){
+        return;
+    }
+    
+    board[r][c].covered = 0;
+    check_win();
+    
+    if(board[r][c].adj_count >0){
+        return;
+    }
+    
+    for(int i=0; i<8;i++){
+        int rn = r + rowneighbors[i];
+        int cn = c + colneighbors[i];
+        if(is_valid_cell(rn, cn)){
+            if(board[rn][cn].covered && !board[rn][cn].has_mine){
+                uncover_recursive(rn, cn);
+            }
+        }
+    }
+    
+}
+
+void command_uncover(int r, int c){
+    if(is_valid_cell(r, c)){
+        r = r-1;
+        c = c-1;
+        if(board[r][c].has_mine == 1){//hit mine
+            printf("%s\n", "You Lost!!");
+            game_reset();
+        }
+        else if(board[r][c].adj_count > 0){//adj count >0
+            board[r][c].covered = 0;
+            check_win();
+        }
+        else if (board[r][c].adj_count == 0){//adj count =0
+            uncover_recursive(r, c);
+        }
+    }
+    else{
+        printf("%s\n", "index out of unbounds");
+    }
+}
+
+
+int all_digits(char *s){
+    int len = strlen(s);
+    for (int i=0; i<len; i++) {
+        if (!isdigit(s[i])) return 0;
+    }
+    return 1;
+}
 
 
 #define MAXCHARLENGTH 80
@@ -179,11 +302,19 @@ int run_game(){
         
         else if(strcmp(tokens[0], "new") == 0){
             //new command
-            printf("%s\n", "New baord created");
-            rows = atoi(tokens[1]);
-            cols = atoi(tokens[2]);
-            mines = atoi(tokens[3]);
-            command_new();
+            if(all_digits(tokens[1]) && all_digits(tokens[2]) && all_digits(tokens[3]) && token_count == 4){
+                printf("%s\n", "New baord created");
+                rows = atoi(tokens[1]);
+                cols = atoi(tokens[2]);
+                mines = atoi(tokens[3]);
+                if(board != NULL){
+                    free(board);
+                }else{
+                    command_new();
+                }
+            }else{
+                printf("invalid arguments passed\n");
+            }
             
         }
         else if(strcmp(tokens[0], "show") == 0){
@@ -191,28 +322,38 @@ int run_game(){
             command_show();
         }
         else if(strcmp(tokens[0], "uncover") == 0){
-            //uncover command
-            
+            if(all_digits(tokens[1]) && all_digits(tokens[2]) && token_count == 3){
+                command_uncover(atoi(tokens[1]), atoi(tokens[2]));
+            }else{
+                printf("invalid arguments passed\n");
+            }
         }
         else if(strcmp(tokens[0], "flag") == 0){
             //flag
-            command_flag(atoi(tokens[1]), atoi(tokens[2]));
+            if(all_digits(tokens[1]) && all_digits(tokens[2]) && token_count == 3){
+                command_flag(atoi(tokens[1]), atoi(tokens[2]));
+            }else{
+                printf("invalid arguments passed\n");
+            }
         }
         else if(strcmp(tokens[0], "unflag") == 0){
             //unflag command
+            if(all_digits(tokens[1]) && all_digits(tokens[2]) && token_count == 3){
+                command_unflag(atoi(tokens[1]), atoi(tokens[2]));
+            }else{
+                printf("invalid arguments passed\n");
+            }
+        }
+        else{
+            printf("unknown command\n");
         }
         
     }
    
-    
-
-//    printf("%lu/n", strlen(cmd));
-//    printf("Hello, World!\n");
     return 1;
 }
 
 int main(int argc, const char * argv[]) {
-    // insert code here...
     run_game();
     return 0;
 }
