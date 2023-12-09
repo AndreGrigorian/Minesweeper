@@ -126,11 +126,12 @@ void display_cell(cell *c) {
     else printf("%3s", ".");
 }
 
-void display_cell_answers(cell *c) {
-    if (c->has_mine == 1) printf("%3s", "*");
-    else if (c->adj_count == 0) printf("%3s", ".");
-    else printf("%3d",c->adj_count);
-}
+////debugging stuff
+//void display_cell_answers(cell *c) {
+//    if (c->has_mine == 1) printf("%3s", "*");
+//    else if (c->adj_count == 0) printf("%3s", ".");
+//    else printf("%3d",c->adj_count);
+//}
 
 
 
@@ -154,22 +155,24 @@ void command_show(){
     }
     
     
-    //----debugging stuff----//
+//    //----debugging stuff----//
+//    
+//    printf("Answers\n");
+//    printf(" ");
+//    for(int i = 0; i<= cols; i++){
+//        printf("%3d", i);
+//    }
+//    printf("\n");
+//    
+//    for(int i = 0; i<rows; i++){
+//        printf("%3d|", i+1); //print row numbers
+//        for(int j = 0; j< cols; j++){
+//            display_cell_answers(&board[i][j]);
+//        }
+//        printf("\n");
+//    }
     
-    printf("Answers\n");
-    printf(" ");
-    for(int i = 0; i<= cols; i++){
-        printf("%3d", i);
-    }
-    printf("\n");
     
-    for(int i = 0; i<rows; i++){
-        printf("%3d|", i+1); //print row numbers
-        for(int j = 0; j< cols; j++){
-            display_cell_answers(&board[i][j]);
-        }
-        printf("\n");
-    }
 }
 
 
@@ -236,7 +239,7 @@ void command_uncover(int r, int c){
         r = r-1;
         c = c-1;
         if(board[r][c].has_mine == 1){//hit mine
-            printf("%s\n", "You Lost!!");
+            printf("%s\n", "You Lost, You Hit a Mine!!");
             game_reset();
         }
         else if(board[r][c].adj_count > 0){//adj count >0
