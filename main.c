@@ -35,7 +35,7 @@ cell **board; //2-d dynamically allocated array of cells
 int rows;
 int cols;
 int mines;
-int uncover_counter; //determines if you win
+
 
 
 
@@ -44,7 +44,6 @@ void game_reset(){
     rows = 0;
     cols = 0;
     mines = 0;
-    uncover_counter = 0;
 }
 
 
@@ -72,8 +71,18 @@ void generate_mines(){
 }
 
 
+void init_cell(cell *c, int p) {
+    c->position = p; // each cell knows its pos in board
+    c->has_mine = 0; // mined initially false
+    c->adj_count = 0; // adjcount initially 0
+    c->covered = 1; // covered initially true
+    c->flagged = 0; // flagged initially false
+}
 
 void command_new(){
+    if(board != NULL){
+        free(board);
+    }
     board = (cell **) malloc(sizeof(cell *) * rows);
     for (int i = 0; i<rows; i++){
         board[i] = (cell *) malloc(sizeof(cell) * cols);
@@ -81,8 +90,7 @@ void command_new(){
     
     for(int i =0; i<rows; i++){
         for (int j=0; j<cols; j++){
-            board[i][j].position = i*cols + j;
-            board[i][j].covered = 1;
+            init_cell(&board[i][j],i*cols + j );
         }
     }
     generate_mines();
@@ -124,13 +132,7 @@ void display_cell_answers(cell *c) {
     else printf("%3d",c->adj_count);
 }
 
-void init_cell(cell *c, int p) {
-    c->position = p; // each cell knows its pos in board
-    c->has_mine = 0; // mined initially false
-    c->adj_count = 0; // adjcount initially 0
-    c->covered = 0; // covered initially true
-    c->flagged = 0; // flagged initially false
-}
+
 
 void command_show(){
     
@@ -141,6 +143,8 @@ void command_show(){
     }
     printf("\n");
     
+    
+
     for(int i = 0; i<rows; i++){
         printf("%3d|", i+1); //print row numbers
         for(int j = 0; j< cols; j++){
@@ -210,27 +214,21 @@ void command_unflag(int r, int c){
 void uncover_recursive(int r, int c){
     int rowneighbors[] = {-1,-1,+0,+1,+1,+1,+0,-1};
     int colneighbors[] = {+0,+1,+1,+1,+0,-1,-1,-1};
-    if(!is_valid_cell(r, c) || !board[r][c].covered || board[r][c].has_mine){
-        return;
-    }
     
     board[r][c].covered = 0;
     check_win();
     
-    if(board[r][c].adj_count >0){
-        return;
-    }
-    
-    for(int i=0; i<8;i++){
-        int rn = r + rowneighbors[i];
-        int cn = c + colneighbors[i];
-        if(is_valid_cell(rn, cn)){
-            if(board[rn][cn].covered && !board[rn][cn].has_mine){
-                uncover_recursive(rn, cn);
+    if(board[r][c].adj_count == 0){
+        for(int i=0; i<8;i++){
+            int rn = r + rowneighbors[i];
+            int cn = c + colneighbors[i];
+            if((rn<rows && rn>=0) && (cn<cols && cn>=0)){ //check if rn and cn are out of bounds
+                if(board[rn][cn].covered && !board[rn][cn].has_mine){
+                    uncover_recursive(rn, cn);
+                }
             }
         }
     }
-    
 }
 
 void command_uncover(int r, int c){
@@ -307,11 +305,12 @@ int run_game(){
                 rows = atoi(tokens[1]);
                 cols = atoi(tokens[2]);
                 mines = atoi(tokens[3]);
-                if(board != NULL){
-                    free(board);
-                }else{
-                    command_new();
-                }
+                command_new();
+//                if(board != NULL){
+//                    free(board);
+//                }else{
+//                    command_new();
+//                }
             }else{
                 printf("invalid arguments passed\n");
             }
